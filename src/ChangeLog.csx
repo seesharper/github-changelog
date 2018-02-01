@@ -169,6 +169,8 @@ public static class ChangeLog
 
         private readonly bool _includeUnreleased;
 
+        private readonly bool _sinceLatestTag;
+
         private readonly List<Func<ClosedIssue, TargetGroup>> _issueMatchers = new List<Func<ClosedIssue, TargetGroup>>();
 
         private readonly List<Func<MergedPullRequest, TargetGroup>> _pullRequestMatchers = new List<Func<MergedPullRequest, TargetGroup>>();
@@ -187,7 +189,7 @@ public static class ChangeLog
             _tagPattern = ".";
         }
 
-        private ChangeLogGenerator(string owner, string name, string apiKey, string defaultIssuesHeader, string defaultPullRequestsHeader, string sinceTag, string header, string tagPattern, bool includeUnreleased, Action<TextWriter, ChangeLogSummary> formatter, List<Func<ClosedIssue, TargetGroup>> issueMatchers, List<Func<MergedPullRequest, TargetGroup>> pullRequestMatchers)
+        private ChangeLogGenerator(string owner, string name, string apiKey, string defaultIssuesHeader, string defaultPullRequestsHeader, string sinceTag, bool sinceLatestTag, string header, string tagPattern, bool includeUnreleased, Action<TextWriter, ChangeLogSummary> formatter, List<Func<ClosedIssue, TargetGroup>> issueMatchers, List<Func<MergedPullRequest, TargetGroup>> pullRequestMatchers)
         {
             _owner = owner;
             _name = name;
@@ -195,6 +197,7 @@ public static class ChangeLog
             _defaultIssuesHeader = defaultIssuesHeader;
             _defaultPullRequestsHeader = defaultPullRequestsHeader;
             _sinceTag = sinceTag;
+            _sinceLatestTag = sinceLatestTag;
             _header = header;
             _tagPattern = tagPattern;
             _includeUnreleased = includeUnreleased;
@@ -229,7 +232,7 @@ public static class ChangeLog
         /// <returns><see cref="ChangeLogGenerator"/></returns>
         public ChangeLogGenerator IncludeUnreleased()
             => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader,
-                _sinceTag, _header, _tagPattern, true, _formatter, _issueMatchers, _pullRequestMatchers);
+                _sinceTag, _sinceLatestTag,_header, _tagPattern, true, _formatter, _issueMatchers, _pullRequestMatchers);
 
         /// <summary>
         /// Creates a new <see cref="ChangeLogGenerator"/> that creates a change log since the given <paramref name="tag"/>.
@@ -237,7 +240,15 @@ public static class ChangeLog
         /// <param name="tag">The name of the tag from where to generate the change log.</param>
         /// <returns><see cref="ChangeLogGenerator"/></returns>
         public ChangeLogGenerator SinceTag(string tag)
-            => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader, tag,
+            => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader, tag, _sinceLatestTag,
+                _header, _tagPattern, _includeUnreleased, _formatter, _issueMatchers, _pullRequestMatchers);
+
+        /// <summary>
+        /// Creates a new <see cref="ChangeLogGenerator"/> that create a change log since the latest tag.
+        /// </summary>
+        /// <returns><see cref="ChangeLogGenerator"/></returns>
+        public ChangeLogGenerator SinceLatestTag()
+            => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader, _sinceTag, true,
                 _header, _tagPattern, _includeUnreleased, _formatter, _issueMatchers, _pullRequestMatchers);
 
         /// <summary>
@@ -247,7 +258,7 @@ public static class ChangeLog
         /// <returns><see cref="ChangeLogGenerator"/></returns>
         public ChangeLogGenerator WithHeader(string customHeader)
             => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader,
-                _sinceTag, customHeader, _tagPattern, _includeUnreleased, _formatter, _issueMatchers,
+                _sinceTag, _sinceLatestTag, customHeader, _tagPattern, _includeUnreleased, _formatter, _issueMatchers,
                 _pullRequestMatchers);
 
         /// <summary>
@@ -257,7 +268,7 @@ public static class ChangeLog
         /// <returns><see cref="ChangeLogGenerator"/></returns>
         public ChangeLogGenerator WithTagsMatching(string pattern)
             => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader,
-                _sinceTag, _header, pattern, _includeUnreleased, _formatter, _issueMatchers, _pullRequestMatchers);
+                _sinceTag, _sinceLatestTag, _header, pattern, _includeUnreleased, _formatter, _issueMatchers, _pullRequestMatchers);
 
         /// <summary>
         /// Creates a new <see cref="ChangeLogGenerator"/> that generates a change log using a custom formatter.
@@ -268,7 +279,7 @@ public static class ChangeLog
         /// <returns></returns>
         public ChangeLogGenerator WithFormatter(Action<TextWriter, ChangeLogSummary> changeLogFormatter)
             => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader,
-                _sinceTag, _header, _tagPattern, _includeUnreleased, changeLogFormatter, _issueMatchers,
+                _sinceTag, _sinceLatestTag, _header, _tagPattern, _includeUnreleased, changeLogFormatter, _issueMatchers,
                 _pullRequestMatchers);
 
         /// <summary>
@@ -281,12 +292,12 @@ public static class ChangeLog
             var httpClient = new HttpClient { BaseAddress = new Uri("https://api.github.com/graphql") };
             httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
             httpClient.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue(new System.Net.Http.Headers.ProductHeaderValue(_name)));
-            var tagCommits = await GetReleaseNoteHeaders(httpClient, _owner, _name);
+            var releaseNoteHeaders = await GetReleaseNoteHeaders(httpClient, _owner, _name);
             var pullrequests = await GetMergedPullRequests(httpClient, _owner, _name);
             var issues = await GetClosedIssues(httpClient, _owner, _name);
 
             var summary = new ChangeLogSummary(_header,
-                tagCommits.Select(tagCommit => CreateReleaseNote(tagCommit, issues, pullrequests)).ToArray());
+                releaseNoteHeaders.Select(tagCommit => CreateReleaseNote(tagCommit, issues, pullrequests)).ToArray());
 
             _formatter(textWriter, summary);
         }
@@ -402,7 +413,7 @@ public static class ChangeLog
             var tagConnection = result.Get<Connection<TagResult>>("repository.tags");
             var firstAndLastCommit = await GetFirstAndLastCommit();
 
-            var nodes = tagConnection.Nodes.OrderByDescending(n => n.Commit.Date).ToArray();
+            var nodes = tagConnection.Nodes.Where(n => Regex.IsMatch(n.Name, _tagPattern)).OrderByDescending(n => n.Commit.Date).ToArray();
 
             string compareUrl = "";
 
@@ -426,12 +437,18 @@ public static class ChangeLog
                 headers.Add(tagCommit);
             }
 
-            if (!string.IsNullOrWhiteSpace(_sinceTag))
+            string sinceTag = _sinceTag;
+            if (_sinceLatestTag)
             {
-                var sinceHeader = headers.FirstOrDefault(tc => tc.Title == _sinceTag);
+                sinceTag = headers.FirstOrDefault()?.Title;
+            }
+
+            if (!string.IsNullOrWhiteSpace(sinceTag))
+            {
+                var sinceHeader = headers.FirstOrDefault(tc => tc.Title == sinceTag);
                 if (sinceHeader == null)
                 {
-                    throw new InvalidOperationException($"Unable to find since tag {_sinceTag}");
+                    throw new InvalidOperationException($"Unable to find since tag {sinceTag}");
                 }
 
                 headers = headers.Where(tc => tc.Until >= sinceHeader.Until).ToList();
@@ -520,7 +537,7 @@ public static class ChangeLog
                 var issueMatchers = new List<Func<ClosedIssue, TargetGroup>>(_generator._issueMatchers);
                 Func<ClosedIssue, TargetGroup> matcher = closedIssue => _predicate(closedIssue) ? new TargetGroup(group, sortOrder) : null;
                 issueMatchers.Add(matcher);
-                return new ChangeLogGenerator(_generator._owner, _generator._name, _generator._apiKey, _generator._defaultIssuesHeader, _generator._defaultPullRequestsHeader, _generator._sinceTag, _generator._header, _generator._tagPattern, _generator._includeUnreleased, _generator._formatter, issueMatchers, _generator._pullRequestMatchers);
+                return new ChangeLogGenerator(_generator._owner, _generator._name, _generator._apiKey, _generator._defaultIssuesHeader, _generator._defaultPullRequestsHeader, _generator._sinceTag, _generator._sinceLatestTag, _generator._header, _generator._tagPattern, _generator._includeUnreleased, _generator._formatter, issueMatchers, _generator._pullRequestMatchers);
             }
 
             /// <summary>
@@ -565,7 +582,7 @@ public static class ChangeLog
                 var pullRequestMatchers = new List<Func<MergedPullRequest, TargetGroup>>(_generator._pullRequestMatchers);
                 Func<MergedPullRequest, TargetGroup> matcher = mergedPullRequest => _predicate(mergedPullRequest) ? new TargetGroup(group, sortOrder) : null;
                 pullRequestMatchers.Add(matcher);
-                return new ChangeLogGenerator(_generator._owner, _generator._name, _generator._apiKey, _generator._defaultIssuesHeader, _generator._defaultPullRequestsHeader, _generator._sinceTag, _generator._header, _generator._tagPattern, _generator._includeUnreleased, _generator._formatter, _generator._issueMatchers, pullRequestMatchers);
+                return new ChangeLogGenerator(_generator._owner, _generator._name, _generator._apiKey, _generator._defaultIssuesHeader, _generator._defaultPullRequestsHeader, _generator._sinceTag, _generator._sinceLatestTag, _generator._header, _generator._tagPattern, _generator._includeUnreleased, _generator._formatter, _generator._issueMatchers, pullRequestMatchers);
             }
 
             /// <summary>
