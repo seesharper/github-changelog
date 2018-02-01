@@ -7,8 +7,8 @@ using static ScriptUnit;
 using static ChangeLog;
 using FluentAssertions;
 
-//await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
-await AddTestsFrom<ChangeLogTests>().Execute();
+await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
+//await AddTestsFrom<ChangeLogTests>().Execute();
 
 public class ChangeLogTests
 {

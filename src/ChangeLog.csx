@@ -357,7 +357,7 @@ public static class ChangeLog
                         //textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToLocalTime().ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
                         textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
                     }
-
+                    textWriter.WriteLine();
                     foreach (var closedIssue in entryGroup.ClosedIssues)
                     {
                         textWriter.WriteLine($@"* {closedIssue.Title} ({closedIssue.ClosedAt}) [\#{closedIssue.Number}]({closedIssue.Url}) ([{closedIssue.UserLogin}]({closedIssue.UserUrl}))");
