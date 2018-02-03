@@ -13,9 +13,7 @@ The changelog is generated based on tags in the target repository where each tag
 ```c#
 using static ChangeLog;
 
-await ChangeLogFrom("seesharper","changelog-fixture", accessToken)
-            .WithFormatter((w,s) => summary = s)
-            .Generate(Console.Out);
+await ChangeLogFrom("seesharper","changelog-fixture", accessToken).Generate(Console.Out);     
 ```
 
 

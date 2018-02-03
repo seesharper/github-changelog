@@ -1,13 +1,13 @@
 #! "netcoreapp2.0"
 #r "nuget:FluentAssertions, 4.19.4"
 #load "nuget:ScriptUnit, 0.1.2"
-#load "ChangeLog.csx"
+#load "GitHub-ChangeLog.csx"
 
 using static ScriptUnit;
 using static ChangeLog;
 using FluentAssertions;
 
-await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldContainCompareUrl").Execute();
+await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
 //await AddTestsFrom<ChangeLogTests>().Execute();
 
 public class ChangeLogTests

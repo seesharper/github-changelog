@@ -359,17 +359,20 @@ public static class ChangeLog
             foreach (var releaseNote in changeLogSummary.ReleaseNotes)
             {
                 textWriter.WriteLine($"## {releaseNote.Header.Title}( {releaseNote.Header.Until} )");
-                var entryGroups = releaseNote.Groups.OrderBy(eg => eg.SortOrder);
-                foreach (var entryGroup in entryGroups)
+                textWriter.WriteLine();
+                textWriter.WriteLine($@"### [Full Changelog]({releaseNote.Header.CompareUrl})");
+                textWriter.WriteLine();
+                var groups = releaseNote.Groups.OrderBy(eg => eg.SortOrder);
+                foreach (var group in groups)
                 {
-                    textWriter.WriteLine($"**{entryGroup.Name}**");
-                    foreach (var mergedPullRequest in entryGroup.MergedPullRequests)
+                    textWriter.WriteLine($"**{group.Name}**");
+                    foreach (var mergedPullRequest in group.MergedPullRequests)
                     {
                         //textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToLocalTime().ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
                         textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
                     }
                     textWriter.WriteLine();
-                    foreach (var closedIssue in entryGroup.ClosedIssues)
+                    foreach (var closedIssue in group.ClosedIssues)
                     {
                         textWriter.WriteLine($@"* {closedIssue.Title} ({closedIssue.ClosedAt}) [\#{closedIssue.Number}]({closedIssue.Url}) ([{closedIssue.UserLogin}]({closedIssue.UserUrl}))");
                         //textWriter.WriteLine($@"* {closedIssue.Title} ({closedIssue.ClosedAt.ToLocalTime().ToString("d")}) [\#{closedIssue.Number}]({closedIssue.Url}) ([{closedIssue.UserLogin}]({closedIssue.UserUrl}))");
