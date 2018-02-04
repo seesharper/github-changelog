@@ -357,8 +357,8 @@ public static class ChangeLog
         {
             textWriter.WriteLine($"# {changeLogSummary.Header}");
             foreach (var releaseNote in changeLogSummary.ReleaseNotes)
-            {
-                textWriter.WriteLine($"## {releaseNote.Header.Title}( {releaseNote.Header.Until} )");
+            {                
+                textWriter.WriteLine($"## [{releaseNote.Header.Title}( {releaseNote.Header.Until.ToLocalTime().ToString("G")} )]({releaseNote.Header.Url})");
                 textWriter.WriteLine();
                 textWriter.WriteLine($@"### [Full Changelog]({releaseNote.Header.CompareUrl})");
                 textWriter.WriteLine();
@@ -419,6 +419,7 @@ public static class ChangeLog
             var nodes = tagConnection.Nodes.Where(n => Regex.IsMatch(n.Name, _tagPattern)).OrderByDescending(n => n.Commit.Date).ToArray();
 
             string compareUrl = "";
+            string url = "";
 
             for (int i = 0; i < nodes.Length; i++)
             {
@@ -436,7 +437,8 @@ public static class ChangeLog
                     compareUrl = $"https://github.com/{owner}/{name}/compare/{firstAndLastCommit.firstCommit.Hash}...{currentTagResult.Name}";
                     since = DateTimeOffset.MinValue;
                 }
-                var tagCommit = new ReleaseNoteHeader(currentTagResult.Name, since, currentTagResult.Commit.Date, compareUrl, "");
+                url = $"https://github.com/{owner}/{name}/tree/{currentTagResult.Name}";
+                var tagCommit = new ReleaseNoteHeader(currentTagResult.Name, since, currentTagResult.Commit.Date, compareUrl, url);
                 headers.Add(tagCommit);
             }
 
@@ -459,18 +461,22 @@ public static class ChangeLog
 
             if (_includeUnreleased)
             {
+                url = $"https://github.com/{owner}/{name}/tree/HEAD";
                 if (headers.Count > 0)
                 {
                     compareUrl = $"https://github.com/{owner}/{name}/compare/{headers.First().Title}...{firstAndLastCommit.latestCommit.Hash}";
                 }
-                var unreleasedHeader = new ReleaseNoteHeader("Unreleased", headers.First().Until, firstAndLastCommit.latestCommit.Date, compareUrl, "");
+                else
+                {
+                    compareUrl = $"https://github.com/{owner}/{name}/compare/{firstAndLastCommit.firstCommit.Hash}...{firstAndLastCommit.latestCommit.Hash}";
+                }
+                var unreleasedHeader = new ReleaseNoteHeader("Unreleased", headers.First().Until, firstAndLastCommit.latestCommit.Date, compareUrl, url);
                 headers.Add(unreleasedHeader);
             }
             return headers.OrderByDescending(tc => tc.Until).ToArray();
 
             async Task<(CommitResult firstCommit, CommitResult latestCommit)> GetFirstAndLastCommit()
             {
-
                 var lastCommitResult = await client.ExecuteAsync(LatestCommitQuery, new { owner, name });
                 var lastCommitConnection = lastCommitResult.Get<Connection<CommitResult>>("repository.ref.target.history");
                 var endCursor = Regex.Replace(lastCommitConnection.PageInfo.EndCursor, @"^(.*\s*)\d+$", "${1}" + lastCommitConnection.TotalCount);

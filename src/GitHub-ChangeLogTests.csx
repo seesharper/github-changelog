@@ -199,7 +199,7 @@ public class ChangeLogTests
 
     public async Task ShouldContainCompareUrl()
     {
-        ChangeLogSummary summary = null; ;
+        ChangeLogSummary summary = null;
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
@@ -215,6 +215,24 @@ public class ChangeLogTests
             .Header.CompareUrl.Should().Be("https://github.com/seesharper/changelog-fixture/compare/0.1.0...0.2.0");            
         summary.ReleaseNotes.Single(rn => rn.Header.Title == "0.1.0")
             .Header.CompareUrl.Should().Be("https://github.com/seesharper/changelog-fixture/compare/edb1d1b32f91cf30466e9111d7f9a26083032491...0.1.0");                    
+    }
+
+    public async Task ShouldContainTagUrl()
+    {
+        ChangeLogSummary summary = null;
+        
+        var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
+        await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
+            .WithFormatter((w, s) => summary = s)
+            .WithTagsMatching("^0.*")  
+            .IncludeUnreleased()              
+            .Generate(Console.Out);
+        summary.ReleaseNotes.Single(rn => rn.Header.Title == "Unreleased")
+            .Header.Url.Should().Be("https://github.com/seesharper/changelog-fixture/tree/HEAD");
+        summary.ReleaseNotes.Single(rn => rn.Header.Title == "0.2.0")
+            .Header.Url.Should().Be("https://github.com/seesharper/changelog-fixture/tree/0.2.0");                
+        summary.ReleaseNotes.Single(rn => rn.Header.Title == "0.1.0")
+            .Header.Url.Should().Be("https://github.com/seesharper/changelog-fixture/tree/0.1.0");                
     }
 
 
