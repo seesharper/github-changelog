@@ -461,16 +461,19 @@ public static class ChangeLog
 
             if (_includeUnreleased)
             {
+                DateTimeOffset since;
                 url = $"https://github.com/{owner}/{name}/tree/HEAD";
                 if (headers.Count > 0)
                 {
+                    since = headers.First().Until;
                     compareUrl = $"https://github.com/{owner}/{name}/compare/{headers.First().Title}...{firstAndLastCommit.latestCommit.Hash}";
                 }
                 else
                 {
+                    since = firstAndLastCommit.firstCommit.Date;
                     compareUrl = $"https://github.com/{owner}/{name}/compare/{firstAndLastCommit.firstCommit.Hash}...{firstAndLastCommit.latestCommit.Hash}";
                 }
-                var unreleasedHeader = new ReleaseNoteHeader("Unreleased", headers.First().Until, firstAndLastCommit.latestCommit.Date, compareUrl, url);
+                var unreleasedHeader = new ReleaseNoteHeader("Unreleased", since, firstAndLastCommit.latestCommit.Date, compareUrl, url);
                 headers.Add(unreleasedHeader);
             }
             return headers.OrderByDescending(tc => tc.Until).ToArray();
