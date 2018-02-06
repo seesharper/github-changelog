@@ -8,6 +8,8 @@ build_script:
 - cmd: >-
     cd build
 
+    refreshenv
+
     dotnet script build.csx
 
 test: off
