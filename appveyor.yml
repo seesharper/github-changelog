@@ -12,6 +12,10 @@ build_script:
 
     dotnet script build.csx
 
+artifacts:
+- path: /**/*.nupkg
+  name: NuGet Packages
+
 test: off
 environment:
     GITHUB_REPO_TOKEN:
