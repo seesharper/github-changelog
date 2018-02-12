@@ -35,7 +35,7 @@ public static class ChangeLog
         name
         commit:target {
           ... on Commit {
-            date: pushedDate,
+            date: committedDate,
             hash: oid,
             url: commitUrl
           }
