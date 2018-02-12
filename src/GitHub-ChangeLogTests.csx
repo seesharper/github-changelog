@@ -1,6 +1,7 @@
 #! "netcoreapp2.0"
 #r "nuget:FluentAssertions, 4.19.4"
-#load "nuget:ScriptUnit, 0.1.3"
+#load "nuget:ScriptUnit, 0.1.4"
+
 #load "GitHub-ChangeLog.csx"
 
 using static ScriptUnit;
@@ -139,9 +140,20 @@ public class ChangeLogTests
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
             .IncludeUnreleased()
             .Generate(Console.Out);
-
-
     }
+
+    public async Task ShouldOutputChangeLogToFile()
+    {
+        var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
+        using (var disposableFolder = new DisposableFolder())
+        {
+            var fileName = Path.Combine(disposableFolder.Path, "CHANGELOG.md");
+            await ChangeLogFrom("seesharper","changelog-fixture", accessToken).Generate(fileName);
+            string content = File.ReadAllText(fileName);
+            content.Should().NotBeEmpty();
+        }
+    }
+
 
     public async Task ShouldPutMergedPullRequestIntoMatchingGroup()
     {
@@ -207,5 +219,5 @@ public class ChangeLogTests
             .Header.Url.Should().Be("https://github.com/seesharper/changelog-fixture/tree/0.2.0");                
         summary.ReleaseNotes.Single(rn => rn.Header.Title == "0.1.0")
             .Header.Url.Should().Be("https://github.com/seesharper/changelog-fixture/tree/0.1.0");                
-    }   
+    }       
 }

@@ -302,6 +302,19 @@ public static class ChangeLog
             _formatter(textWriter, summary);
         }
 
+        /// <summary>
+        /// Generates the change log and writes the generated <see cref="ChangeLogSummary"/> to the given <paramref name="outputPath"/>.
+        /// </summary>
+        /// <param name="outputPath">The full path to the output file.</param>
+        /// <returns></returns>
+        public async Task Generate(string outputPath)
+        {
+            using (StreamWriter streamWriter = new StreamWriter(outputPath))
+            {                
+                await Generate(streamWriter);
+            }
+        }
+
         private ReleaseNote CreateReleaseNote(ReleaseNoteHeader header, ClosedIssue[] closedIssues, MergedPullRequest[] mergedPullRequests)
         {
             var categorizedEntries = new Dictionary<TargetGroup, (List<ClosedIssue> issues, List<MergedPullRequest> pullRequests)>();
