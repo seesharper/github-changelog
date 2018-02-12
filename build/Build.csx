@@ -34,7 +34,7 @@ Copy(Path.Combine(scriptFolder,"..","src","GraphQL.csx"), Path.Combine(contentFo
 Copy(Path.Combine(scriptFolder,"GitHub-ChangeLog.nuspec"), Path.Combine(tempFolder,"GitHub-ChangeLog.nuspec"));
 
 string pathToUnitTests = Path.Combine(scriptFolder,"..","src","GitHub-ChangeLogTests.csx");
-// DotNet.Test(pathToUnitTests);
+DotNet.Test(pathToUnitTests);
 
 NuGet.Pack(tempFolder, pathToNuGetArtifacts);
 
