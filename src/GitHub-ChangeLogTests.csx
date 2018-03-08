@@ -8,7 +8,7 @@ using static ScriptUnit;
 using static ChangeLog;
 using FluentAssertions;
 
-// await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
+//await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
 await AddTestsFrom<ChangeLogTests>().Execute();
 
 public class ChangeLogTests
@@ -138,8 +138,8 @@ public class ChangeLogTests
     {
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .IncludeUnreleased()
-            .Generate(Console.Out);
+            .IncludeUnreleased().SinceLatestTag()
+            .Generate(Console.Out);        
     }
 
     public async Task ShouldOutputChangeLogToFile()

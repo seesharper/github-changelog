@@ -487,7 +487,7 @@ public static class ChangeLog
                 var unreleasedHeader = new ReleaseNoteHeader("Unreleased", since, firstAndLastCommit.latestCommit.Date, compareUrl, url);
                 headers.Add(unreleasedHeader);
             }
-            return headers.OrderByDescending(tc => tc.Until).ToArray();
+            return headers.OrderByDescending(tc => tc.Since).ToArray();
 
             async Task<(CommitResult firstCommit, CommitResult latestCommit)> GetFirstAndLastCommit()
             {
@@ -502,11 +502,24 @@ public static class ChangeLog
 
         private async Task<MergedPullRequest[]> GetMergedPullRequests(HttpClient client, string owner, string name)
         {
+            var connections = new List<Connection<MergedPullRequestResult>>();
+                                    
+            var mergedPullRequestConnection = await ExecuteQuery();
+            connections.Add(mergedPullRequestConnection);
+            while(mergedPullRequestConnection.PageInfo.HasNextPage)
+            {
+                mergedPullRequestConnection = await ExecuteQuery(mergedPullRequestConnection.PageInfo.EndCursor);
+                connections.Add(mergedPullRequestConnection);
+            }
+           
+            return connections.SelectMany(c => c.Nodes).Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
+            
 
-            var result = await client.ExecuteAsync(MergedPullRequestsQuery, new { owner, name });
-            var mergedPullRequestConnection = result.Get<Connection<MergedPullRequestResult>>("repository.pullRequests");
-
-            var mergedPullRequests = mergedPullRequestConnection.Nodes.Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToList();
+            async Task<Connection<MergedPullRequestResult>> ExecuteQuery(string endCursor = null)
+            {
+                var result = await client.ExecuteAsync(MergedPullRequestsQuery, new { owner, name, endCursor });
+                return result.Get<Connection<MergedPullRequestResult>>("repository.pullRequests");
+            }
 
             DateTimeOffset GetMergedDate(MergedPullRequestResult pullRequestResult)
             {
@@ -517,16 +530,26 @@ public static class ChangeLog
 
                 return pullRequestResult.MergedAt;
             }
-
-            return mergedPullRequests.ToArray();
         }
 
         private async Task<ClosedIssue[]> GetClosedIssues(HttpClient client, string owner, string name)
         {
-            var result = await client.ExecuteAsync(ClosedIssuesQuery, new { owner, name });
-            var closedIssuesConnection = result.Get<Connection<ClosedIssueResult>>("repository.issues");
-            var closedIssues = closedIssuesConnection.Nodes.Select(n => new ClosedIssue(n.Number, n.Title, n.Url, n.ClosedAt.AddMinutes(-2), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToList();
-            return closedIssues.ToArray();
+            var connections = new List<Connection<ClosedIssueResult>>();
+            var closedIssuesConnection = await ExecuteQuery();
+            connections.Add(closedIssuesConnection);
+            while(closedIssuesConnection.PageInfo.HasNextPage)
+            {
+                closedIssuesConnection = await ExecuteQuery();
+                connections.Add(closedIssuesConnection);
+            }
+            
+            return connections.SelectMany(c => c.Nodes).Select(n => new ClosedIssue(n.Number, n.Title, n.Url, n.ClosedAt.AddMinutes(-2), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
+           
+            async Task<Connection<ClosedIssueResult>> ExecuteQuery(string endCursor = null)
+            {
+                var result = await client.ExecuteAsync(ClosedIssuesQuery, new { owner, name, endCursor });
+                return result.Get<Connection<ClosedIssueResult>>("repository.issues");
+            }
         }
 
         /// <summary>
