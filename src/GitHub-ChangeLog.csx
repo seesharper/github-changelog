@@ -58,6 +58,7 @@ public static class ChangeLog
       	title,  
       	mergedAt,
         url,
+        body,
       	labels(first:100)
       	{
           nodes
@@ -512,7 +513,7 @@ public static class ChangeLog
                 connections.Add(mergedPullRequestConnection);
             }
            
-            return connections.SelectMany(c => c.Nodes).Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
+            return connections.SelectMany(c => c.Nodes).Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, n.Body, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
             
 
             async Task<Connection<MergedPullRequestResult>> ExecuteQuery(string endCursor = null)
@@ -692,12 +693,13 @@ public static class ChangeLog
 
         public class MergedPullRequestResult
         {
-            public MergedPullRequestResult(int number, string title, DateTimeOffset mergedAt, string url, Connection<LabelResult> labels, UserResult author, CommitResult mergeCommit)
+            public MergedPullRequestResult(int number, string title, DateTimeOffset mergedAt, string url, string body, Connection<LabelResult> labels, UserResult author, CommitResult mergeCommit)
             {
                 Number = number;
                 Title = title;
                 MergedAt = mergedAt;
                 Url = url;
+                Body = body;
                 Labels = labels;
                 Author = author;
                 MergeCommit = mergeCommit;
@@ -707,6 +709,7 @@ public static class ChangeLog
             public string Title { get; }
             public DateTimeOffset MergedAt { get; }
             public string Url { get; }
+            public string Body { get; }
             public Connection<LabelResult> Labels { get; }
             public UserResult Author { get; }
             public CommitResult MergeCommit { get; }
@@ -862,11 +865,12 @@ public static class ChangeLog
         /// <param name="number">The id of the pullrequest.</param>
         /// <param name="title">The title of the pull request.</param>
         /// <param name="url">The url to the pullrequest on GitHub.</param>
+        /// <param name="bodyurl">The body of the pullrequest description.</param>
         /// <param name="mergedAt">The <see cref="DateTimeOffset"/> for when this pullrequest was merged.</param>
         /// <param name="userLogin">The user that created the pull request.</param>
         /// <param name="userUrl">The url to the GitHub user that created the pull request.</param>
         /// <param name="labels">A list of labels for this pullrequest.</param>
-        public MergedPullRequest(int number, string title, string url, DateTimeOffset mergedAt, string userLogin, string userUrl, string[] labels)
+        public MergedPullRequest(int number, string title, string url, string body, DateTimeOffset mergedAt, string userLogin, string userUrl, string[] labels)
         {
             Number = number;
             Title = title;
@@ -1021,5 +1025,23 @@ public static class ChangeLog
         /// Gets the url to the tag/release.
         /// </summary>
         public string Url { get; }
+    }
+
+    public class FormattingOptions
+    {
+        
+        public static FormattingOptions Default = new FormattingOptions(includePullRequestBody:false);
+        
+        private FormattingOptions(bool includePullRequestBody)
+        {
+            
+        }
+        
+        public bool IncludePullRequestBody {get;}
+
+        public FormattingOptions WithPullRequestBody()
+        {
+            return new FormattingOptions(includePullRequestBody:true);
+        }
     }
 }
