@@ -58,6 +58,7 @@ public static class ChangeLog
       	title,  
       	mergedAt,
         url,
+        body,
       	labels(first:100)
       	{
           nodes
@@ -175,7 +176,7 @@ public static class ChangeLog
 
         private readonly List<Func<MergedPullRequest, TargetGroup>> _pullRequestMatchers = new List<Func<MergedPullRequest, TargetGroup>>();
 
-        private readonly Action<TextWriter, ChangeLogSummary> _formatter;
+        private readonly Action<TextWriter, ChangeLogSummary, FormattingOptions> _formatter;
 
         internal ChangeLogGenerator(string owner, string name, string apiKey)
         {
@@ -189,7 +190,7 @@ public static class ChangeLog
             _tagPattern = ".";
         }
 
-        private ChangeLogGenerator(string owner, string name, string apiKey, string defaultIssuesHeader, string defaultPullRequestsHeader, string sinceTag, bool sinceLatestTag, string header, string tagPattern, bool includeUnreleased, Action<TextWriter, ChangeLogSummary> formatter, List<Func<ClosedIssue, TargetGroup>> issueMatchers, List<Func<MergedPullRequest, TargetGroup>> pullRequestMatchers)
+        private ChangeLogGenerator(string owner, string name, string apiKey, string defaultIssuesHeader, string defaultPullRequestsHeader, string sinceTag, bool sinceLatestTag, string header, string tagPattern, bool includeUnreleased, Action<TextWriter, ChangeLogSummary, FormattingOptions> formatter, List<Func<ClosedIssue, TargetGroup>> issueMatchers, List<Func<MergedPullRequest, TargetGroup>> pullRequestMatchers)
         {
             _owner = owner;
             _name = name;
@@ -277,7 +278,7 @@ public static class ChangeLog
         /// <param name="changeLogFormatter">A delegate providing the <see cref="ChangeLogSummary"/>
         /// that represents the generated change log.</param>
         /// <returns></returns>
-        public ChangeLogGenerator WithFormatter(Action<TextWriter, ChangeLogSummary> changeLogFormatter)
+        public ChangeLogGenerator WithFormatter(Action<TextWriter, ChangeLogSummary, FormattingOptions> changeLogFormatter)
             => new ChangeLogGenerator(_owner, _name, _apiKey, _defaultIssuesHeader, _defaultPullRequestsHeader,
                 _sinceTag, _sinceLatestTag, _header, _tagPattern, _includeUnreleased, changeLogFormatter, _issueMatchers,
                 _pullRequestMatchers);
@@ -286,8 +287,9 @@ public static class ChangeLog
         /// Generates the change log and writes the generated <see cref="ChangeLogSummary"/> to the given <paramref name="textWriter"/>.
         /// </summary>
         /// <param name="textWriter">The <see cref="TextWriter"/> used to output the <see cref="ChangeLogSummary"/>.</param>
+        /// <param name="formattingOptions">The <see cref="FormattingOptions"/> used to output the <see cref="ChangeLogSummary"/>.</param>
         /// <returns></returns>
-        public async Task Generate(TextWriter textWriter)
+        public async Task Generate(TextWriter textWriter, FormattingOptions formattingOptions)
         {
             var httpClient = new HttpClient { BaseAddress = new Uri("https://api.github.com/graphql") };
             httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
@@ -299,7 +301,17 @@ public static class ChangeLog
             var summary = new ChangeLogSummary(_header,
                 releaseNoteHeaders.Select(tagCommit => CreateReleaseNote(tagCommit, issues, pullrequests)).ToArray());
 
-            _formatter(textWriter, summary);
+            _formatter(textWriter, summary, formattingOptions);
+        }
+        
+        /// <summary>
+        /// Generates the change log and writes the generated <see cref="ChangeLogSummary"/> to the given <paramref name="textWriter"/>.
+        /// </summary>
+        /// <param name="textWriter">The <see cref="TextWriter"/> used to output the <see cref="ChangeLogSummary"/>.</param>
+        /// <returns></returns>
+        public async Task Generate(TextWriter textWriter)
+        {
+            await Generate(textWriter, FormattingOptions.Default);
         }
 
         /// <summary>
@@ -309,9 +321,20 @@ public static class ChangeLog
         /// <returns></returns>
         public async Task Generate(string outputPath)
         {
+            await Generate(outputPath, FormattingOptions.Default);
+        }
+
+         /// <summary>
+        /// Generates the change log and writes the generated <see cref="ChangeLogSummary"/> to the given <paramref name="outputPath"/>.
+        /// </summary>
+        /// <param name="outputPath">The full path to the output file.</param>
+        /// <param name="formattingOptions">The <see cref="FormattingOptions"/> used to output the <see cref="ChangeLogSummary"/>.</param>
+        /// <returns></returns>
+        public async Task Generate(string outputPath, FormattingOptions formattingOptions)
+        {
             using (StreamWriter streamWriter = new StreamWriter(outputPath))
             {                
-                await Generate(streamWriter);
+                await Generate(streamWriter, formattingOptions);
             }
         }
 
@@ -366,7 +389,7 @@ public static class ChangeLog
         /// </summary>
         /// <param name="textWriter">The <see cref="TextWriter"/> for which to write out the <paramref name="changeLogSummary"/>.</param>
         /// <param name="changeLogSummary">The <see cref="ChangeLogSummary"/> representing the generated change log.</param>
-        public static void AsMarkdown(TextWriter textWriter, ChangeLogSummary changeLogSummary)
+        public static void AsMarkdown(TextWriter textWriter, ChangeLogSummary changeLogSummary, FormattingOptions formattingOptions)
         {
             textWriter.WriteLine($"# {changeLogSummary.Header}");
             foreach (var releaseNote in changeLogSummary.ReleaseNotes)
@@ -377,11 +400,19 @@ public static class ChangeLog
                 textWriter.WriteLine();
                 var groups = releaseNote.Groups.OrderBy(eg => eg.SortOrder);
                 foreach (var group in groups)
-                {
-                    textWriter.WriteLine($"**{group.Name}**");
+                {                    
+                    textWriter.WriteLine($"#### {group.Name}");
                     foreach (var mergedPullRequest in group.MergedPullRequests)
-                    {                        
-                        textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
+                    {                                                
+                        if (formattingOptions.IncludePullRequestBody)
+                        {
+                            textWriter.WriteLine($@"**{mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))**");
+                            textWriter.WriteLine(mergedPullRequest.Body);
+                        }
+                        else
+                        {
+                            textWriter.WriteLine($@"* {mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))");
+                        }
                     }
                     textWriter.WriteLine();
                     foreach (var closedIssue in group.ClosedIssues)
@@ -512,7 +543,7 @@ public static class ChangeLog
                 connections.Add(mergedPullRequestConnection);
             }
            
-            return connections.SelectMany(c => c.Nodes).Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
+            return connections.SelectMany(c => c.Nodes).Select(n => new MergedPullRequest(n.Number, n.Title, n.Url, n.Body, GetMergedDate(n), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
             
 
             async Task<Connection<MergedPullRequestResult>> ExecuteQuery(string endCursor = null)
@@ -539,12 +570,12 @@ public static class ChangeLog
             connections.Add(closedIssuesConnection);
             while(closedIssuesConnection.PageInfo.HasNextPage)
             {
-                closedIssuesConnection = await ExecuteQuery();
+                closedIssuesConnection = await ExecuteQuery(closedIssuesConnection.PageInfo.EndCursor);
                 connections.Add(closedIssuesConnection);
             }
-            
-            return connections.SelectMany(c => c.Nodes).Select(n => new ClosedIssue(n.Number, n.Title, n.Url, n.ClosedAt.AddMinutes(-2), n.Author.Login, n.Author.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray();
-           
+
+            return connections.SelectMany(c => c.Nodes).Select(n => new ClosedIssue(n.Number, n.Title, n.Url, n.ClosedAt.AddMinutes(-2), n.Author?.Login, n.Author?.Url, n.Labels.Nodes.Select(ln => ln.Name).ToArray())).ToArray(); 
+
             async Task<Connection<ClosedIssueResult>> ExecuteQuery(string endCursor = null)
             {
                 var result = await client.ExecuteAsync(ClosedIssuesQuery, new { owner, name, endCursor });
@@ -692,12 +723,13 @@ public static class ChangeLog
 
         public class MergedPullRequestResult
         {
-            public MergedPullRequestResult(int number, string title, DateTimeOffset mergedAt, string url, Connection<LabelResult> labels, UserResult author, CommitResult mergeCommit)
+            public MergedPullRequestResult(int number, string title, DateTimeOffset mergedAt, string url, string body, Connection<LabelResult> labels, UserResult author, CommitResult mergeCommit)
             {
                 Number = number;
                 Title = title;
                 MergedAt = mergedAt;
                 Url = url;
+                Body = body;
                 Labels = labels;
                 Author = author;
                 MergeCommit = mergeCommit;
@@ -707,6 +739,7 @@ public static class ChangeLog
             public string Title { get; }
             public DateTimeOffset MergedAt { get; }
             public string Url { get; }
+            public string Body { get; }
             public Connection<LabelResult> Labels { get; }
             public UserResult Author { get; }
             public CommitResult MergeCommit { get; }
@@ -862,15 +895,17 @@ public static class ChangeLog
         /// <param name="number">The id of the pullrequest.</param>
         /// <param name="title">The title of the pull request.</param>
         /// <param name="url">The url to the pullrequest on GitHub.</param>
+        /// <param name="body">The body of the pullrequest description.</param>
         /// <param name="mergedAt">The <see cref="DateTimeOffset"/> for when this pullrequest was merged.</param>
         /// <param name="userLogin">The user that created the pull request.</param>
         /// <param name="userUrl">The url to the GitHub user that created the pull request.</param>
         /// <param name="labels">A list of labels for this pullrequest.</param>
-        public MergedPullRequest(int number, string title, string url, DateTimeOffset mergedAt, string userLogin, string userUrl, string[] labels)
+        public MergedPullRequest(int number, string title, string url, string body, DateTimeOffset mergedAt, string userLogin, string userUrl, string[] labels)
         {
             Number = number;
             Title = title;
             Url = url;
+            Body = body;
             MergedAt = mergedAt;
             UserLogin = userLogin;
             UserUrl = userUrl;
@@ -891,6 +926,7 @@ public static class ChangeLog
         /// Gets url to the pullrequest on GitHub. 
         /// </summary>
         public string Url { get; }
+        public string Body { get; }
 
         /// <summary>
         /// Gets the <see cref="DateTimeOffset"/> for when this pullrequest was merged.
@@ -1021,5 +1057,23 @@ public static class ChangeLog
         /// Gets the url to the tag/release.
         /// </summary>
         public string Url { get; }
+    }
+
+    public class FormattingOptions
+    {
+        
+        public static FormattingOptions Default = new FormattingOptions(includePullRequestBody:false);
+        
+        private FormattingOptions(bool includePullRequestBody)
+        {
+            IncludePullRequestBody = true;
+        }
+        
+        public bool IncludePullRequestBody {get;}
+
+        public FormattingOptions WithPullRequestBody()
+        {
+            return new FormattingOptions(includePullRequestBody:true);
+        }
     }
 }
