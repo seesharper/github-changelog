@@ -3,7 +3,7 @@
   <metadata>
     <id>github-changelog</id>
     <title>github-changelog</title>
-    <version>0.1.4</version>
+    <version>0.1.5</version>
     <description>Generates changelog/releasenotes from GitHub repositories</description>
     <authors>Bernhard Richter</authors>
     <owners>Bernhard Richter</owners>

@@ -8,7 +8,7 @@ using static ScriptUnit;
 using static ChangeLog;
 using FluentAssertions;
 
-//await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateFullChangeLog").Execute();
+// await AddTestsFrom<ChangeLogTests>().AddFilter(m => m.Name == "ShouldGenerateChangeLogWithPullRequestBody").Execute();
 await AddTestsFrom<ChangeLogTests>().Execute();
 
 public class ChangeLogTests
@@ -19,7 +19,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .Generate(Console.Out);
 
         summary.Header.Should().Be("Change Log");
@@ -32,7 +32,7 @@ public class ChangeLogTests
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
             .WithHeader("Release Notes")
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .Generate(Console.Out);
 
         summary.Header.Should().Be("Release Notes");
@@ -44,7 +44,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .Generate(Console.Out);
 
         var releaseNote = summary.ReleaseNotes.Single(r => r.Header.Title == "0.1.0");
@@ -57,7 +57,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .PullRequestsMatching(pr => pr.Labels.Contains("bug")).GroupsInto("Fixed Bugs")
             .Generate(Console.Out);
 
@@ -72,7 +72,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .Generate(Console.Out);
 
         var releaseNote = summary.ReleaseNotes.Single(r => r.Header.Title == "0.2.0");
@@ -85,7 +85,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .IssuesMatching(i => true).GroupsInto("Custom Group")
             .Generate(Console.Out);
 
@@ -100,7 +100,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .SinceTag("0.2.0")
             .IncludeUnreleased()
             .Generate(Console.Out);
@@ -113,7 +113,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .WithTagsMatching("^0.*")
             .SinceLatestTag()            
             .Generate(Console.Out);
@@ -127,7 +127,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper","changelog-fixture", accessToken)
-            .WithFormatter((w,s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .SinceTag("0.2.0")            
             .Generate(Console.Out);
         summary.ReleaseNotes.Should().Contain(note => note.Header.Title == "0.2.0");
@@ -161,7 +161,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper","changelog-fixture", accessToken)
-            .WithFormatter((w,s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .PullRequestsMatching(p => p.Labels.Contains("enhancement")).GroupsInto("Implemented Features")
             .SinceTag("0.2.0")            
             .Generate(Console.Out);
@@ -171,16 +171,28 @@ public class ChangeLogTests
    
     public async Task ShouldGenerateOnlyForMatchingTags()
     {
-        ChangeLogSummary summary = null; ;
+        ChangeLogSummary summary = null;
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .WithTagsMatching("major.*")
             .Generate(Console.Out);
         var releaseNote = summary.ReleaseNotes.Single(r => r.Header.Title == "major1.0.0");
 
         releaseNote.Groups.SelectMany(cig => cig.ClosedIssues).Count().Should().Be(2);
+    }
+
+    public async Task ShouldGenerateChangeLogWithPullRequestBody()
+    {
+        ChangeLogSummary summary = null;
+        var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
+        await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
+            .WithFormatter((w, s, o) => summary = s)
+            .IncludeUnreleased().SinceLatestTag()
+            .Generate(Console.Out,FormattingOptions.Default.WithPullRequestBody());    
+        var pullRequests = summary.ReleaseNotes.SelectMany(rl => rl.Groups).SelectMany(g => g.MergedPullRequests);
+        pullRequests.All(pr => !string.IsNullOrWhiteSpace(pr.Body)).Should().BeTrue();
     }
 
     public async Task ShouldContainCompareUrl()
@@ -189,7 +201,7 @@ public class ChangeLogTests
 
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .WithTagsMatching("^0.*")  
             .IncludeUnreleased()              
             .Generate(Console.Out);
@@ -209,7 +221,7 @@ public class ChangeLogTests
         
         var accessToken = System.Environment.GetEnvironmentVariable("GITHUB_REPO_TOKEN");
         await ChangeLogFrom("seesharper", "changelog-fixture", accessToken)
-            .WithFormatter((w, s) => summary = s)
+            .WithFormatter((w, s, o) => summary = s)
             .WithTagsMatching("^0.*")  
             .IncludeUnreleased()              
             .Generate(Console.Out);
