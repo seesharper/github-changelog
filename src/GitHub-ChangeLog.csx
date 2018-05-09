@@ -407,6 +407,7 @@ public static class ChangeLog
                         if (formattingOptions.IncludePullRequestBody)
                         {
                             textWriter.WriteLine($@"**{mergedPullRequest.Title} ({mergedPullRequest.MergedAt.ToString("d")}) [\#{mergedPullRequest.Number}]({mergedPullRequest.Url}) ([{mergedPullRequest.UserLogin}]({mergedPullRequest.UserUrl}))**");
+                            textWriter.WriteLine();
                             textWriter.WriteLine(mergedPullRequest.Body);
                         }
                         else
@@ -1066,7 +1067,7 @@ public static class ChangeLog
         
         private FormattingOptions(bool includePullRequestBody)
         {
-            IncludePullRequestBody = true;
+            IncludePullRequestBody = includePullRequestBody;
         }
         
         public bool IncludePullRequestBody {get;}
